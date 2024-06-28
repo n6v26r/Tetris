@@ -2,6 +2,7 @@
 #include "tetris.h"
 #include "utils.h"
 #include <asm-generic/ioctls.h>
+#include <curses.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -9,25 +10,32 @@
 #define MINROWS 30
 #define MINCOLS 20
 
+WINDOW* w;
+
 void clearScreen();
 
 void drawBaord();
 
 void initDisplay(){
-  struct winsize w;
-  ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-  assert(w.ws_row>=MINROWS && w.ws_col>=MINCOLS, err, "Window size must be at least %dx%d",MINROWS, MINCOLS);
+  struct winsize win;
+  ioctl(STDOUT_FILENO, TIOCGWINSZ, &win);
+  assert(win.ws_row>=MINROWS && win.ws_col>=MINCOLS, err, "Window size must be at least %dx%d",MINROWS, MINCOLS);
   system("stty -echo"); // disable text echo
+  // TODO: Find a bttr way to disable cursor
   printf("\33[?25l");
+  // Configure for async input using curses
+  w = initscr();
+  noecho(); 
+  nodelay(w, 1);
 }
 
 void drawBoard(gameManager* game){
   clearScreen();
   for(int i=game->sizeY-1; i>=0; i--){
     for(int j=0; j<game->sizeX; j++){
-      if(game->board[i][j]>0) printf("%d", game->board[i][j]);
-      else if(game->board[i][j]==0)printf(" ");
-      else printf("#");
+      if(game->board[i][j]>0) printf("[]");
+      else if(game->board[i][j]==0)printf("  ");
+      else printf("##");
     }
     printf("%s", ENDL);
   }
@@ -38,6 +46,9 @@ void clearScreen(){
 }
 
 void exitDisplay(){
-  printf("\33[?24h");
+  echo();
+  nodelay(w, 0);
+  endwin();
+  printf("\33[?25h");
   system("stty echo");
 }

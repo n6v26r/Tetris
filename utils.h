@@ -84,7 +84,7 @@ double getTime(){
 
 void terminate(int code){
   debug(stdout, info, "Terminating...");
+  printf("\33[?25h");
   system("stty echo");
-  printf("\e[?25h");
   exit(code);
 }

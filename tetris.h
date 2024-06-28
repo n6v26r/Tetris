@@ -1,3 +1,4 @@
+// __n6v26r was here
 #include "utils.h"
 #include <stdio.h>
 #include <unistd.h>
@@ -96,7 +97,7 @@ typedef struct _GameManager{
   enum Tetriminos curr; // current piece
   int currPieceState[4][4];
   pos currPos;
-  enum Tetriminos* next; // pointer into the piece bag
+  enum Tetriminos* next; // pointer to the piece bag
   // This implementation uses the original random bag extract method as the original tetris game.
   enum Tetriminos pieceBag[TETRIMINOS];
   short int bagSize;
@@ -116,6 +117,7 @@ bool update(gameManager* game);
 
 void rotatePiece(gameManager *game);
 void moveUp(gameManager *game);
+void moveDown(gameManager* game);
 void moveL(gameManager *game);
 void moveR(gameManager *game);
 void drop(gameManager *game);
@@ -177,7 +179,6 @@ void refreshBag(gameManager* game){
       piece = rand()%7+1; 
     }while(used[piece]);
     used[piece] = 1;
-    debug(stdout, info, "choose: %d", piece);
     game->pieceBag[game->bagSize++] = pieces[piece];
   }
   game->next = game->pieceBag;
@@ -208,9 +209,6 @@ void rotatePiece(gameManager *game){
   int n = size(game->curr);
   int buffer[4][4];
 
-  // for(int i=0; i<n; i++)
-  //   for(int j=0; j<n; j++)
-  //     buffer[i][j] = game->currPieceState[i][j];
   for(int i = 0; i < n; i++){
 		for(int j = 0, k = n-1; j<n; j++, k--)
 			buffer[i][j] = game->currPieceState[k][i];
@@ -226,13 +224,14 @@ void rotatePiece(gameManager *game){
       buffer[y][x] = aux;
     }
 
+  // move piece if it hits wall
   pos savePos = game->currPos;
   int coll;
   do{
     coll = collision(game);
-    if(coll==-1) game->currPos.x++;
-    if(coll==-2) game->currPos.x--;
-    if(coll==-3) game->currPos.y++;
+    if(coll==left) game->currPos.x++;
+    if(coll==right) game->currPos.x--;
+    if(coll==bottom) game->currPos.y++;
   }while(coll<0);
   
   if(coll) {
@@ -243,6 +242,7 @@ void rotatePiece(gameManager *game){
     drawPiece(game);
     return; // cannot rotate
   }
+
   drawPiece(game);
 } 
 
@@ -250,7 +250,7 @@ void moveR(gameManager *game){
   removePiece(game);
   game->currPos.x++;
   int coll = collision(game);
-  if(coll!=0 && coll!=-1) game->currPos.x--;
+  if(coll && coll!=-1) game->currPos.x--;
   drawPiece(game);
 }
 
@@ -258,9 +258,7 @@ void moveL(gameManager *game){
   removePiece(game);
   game->currPos.x--;
   int coll = collision(game);
-  // debug(stdout, warn, "{%d %d} : %d", game->currPos.x, game->currPos.y, collision(game));
-  // usleep(500000);
-  if(coll!=0 && coll!=-2) game->currPos.x++;
+  if(coll && coll!=-2) game->currPos.x++;
   drawPiece(game);
 }
 
@@ -268,7 +266,19 @@ void moveUp(gameManager *game){ // only for rotations
   removePiece(game);
   game->currPos.y++;
   int coll = collision(game);
-  if(coll!=0 && coll!=-3) game->currPos.y--;
+  if(coll && coll!=-3) game->currPos.y--;
+  drawPiece(game);
+}
+
+void moveDown(gameManager *game){
+  removePiece(game);
+  game->currPos.y--;
+  int coll = collision(game);
+  if(coll){
+    game->currPos.y++;
+    freezePiece(game);
+  }
+  drawPiece(game);
 }
 
 void drop(gameManager *game){
@@ -307,9 +317,8 @@ void cancelCurrPiece(gameManager* game){
   assert(game->curr!=_NULL, err, "{BUG} Tried to cancel NULL piece.");
   removePiece(game);
 }
+
 bool update(gameManager* game){
-  // debug(stdout, warn, "%f", getTime()-game->lastDescend<=pieceFallDelay[game->level]);
-  // debug(stdout, warn, "%f", getTime());
   if(getTime()-game->lastDescend<=pieceFallDelay[game->level]) return false;
   game->lastDescend = getTime();
   removePiece(game);
@@ -317,19 +326,17 @@ bool update(gameManager* game){
 
   int coll = collision(game);
   if(coll==-3 || coll>0){ // reached bottom
-    debug(stdout, info, "COLLISION: %d", coll);
     game->currPos.y++;
     freezePiece(game);
   }
 
-  // assert(!collision(game), err, "A collision happened. This is prob. good %d", collision(game));
   drawPiece(game);
   return true;
 }
 
 void freezePiece(gameManager *game){
   drawPiece(game);
-  // clear possible lines
+  // clear all possible lines
   for(int y = 0; y<size(game->curr); y++){
     if(checkLine(game, game->currPos.y-y))
       clearLine(game, game->currPos.y-y);
@@ -339,6 +346,7 @@ void freezePiece(gameManager *game){
   spawnPiece(game);
 }
 
+// check if line is full
 bool checkLine(gameManager *game, int y){
   if(y<=0) return false;
   for(int x = 1; x<SIZEX-1; x++)
@@ -347,6 +355,7 @@ bool checkLine(gameManager *game, int y){
 }
 
 void clearLine(gameManager *game, int y){
+  // clear line at y
   for(int x = 1; x<SIZEX-1; x++)
     game->board[y][x] = 0;
   
@@ -356,7 +365,6 @@ void clearLine(gameManager *game, int y){
       game->board[yy-1][x] = game->board[yy][x];
 }
 
-// TODO: Make sure this works
 void hold(gameManager* game){
   if(game->pieceHeld) return; 
   cancelCurrPiece(game);

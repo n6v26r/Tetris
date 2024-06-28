@@ -1,20 +1,28 @@
 #include "utils.h"
 #include "tetris.h"
 #include "display.h"
+#include <ctype.h>
 #include <curses.h>
+#include <signal.h>
 #include <time.h>
 #include <unistd.h>
 #pragma optimize GCC("O2")
 
-#define INPUT_DELAY 1000 // microseconds
+#define INPUT_DELAY 0.07f
 
-double lastInputRead;
+double lastInputRead = 0.0f;
 
 gameManager game;
 
 bool parseInput(gameManager *game){
-  bool updatedPiece= false;
+  bool updatedPiece = false;
   int input = getAsyncInput();
+  if(!(isalpha(input) || isspace(input))) return false;
+
+  if(getTime()-lastInputRead<=INPUT_DELAY)
+    return false;
+
+  lastInputRead = getTime();
   switch(input){
     case 'A':
       rotatePiece(game);
@@ -28,6 +36,10 @@ bool parseInput(gameManager *game){
       moveR(game);
       updatedPiece = true;
       break;
+    case 'B':
+      moveDown(game);
+      updatedPiece = true;
+      break;
     case ' ':
       drop(game);
       updatedPiece = true;
@@ -36,34 +48,36 @@ bool parseInput(gameManager *game){
       hold(game);
       updatedPiece = true;
       break;
-    default: // still have to implement force drop
+    case 'p': // pause
+      waitFor('p');
+      break;
+    case 'e':
+      exitDisplay();
+      exit(0);
+      break;
+    default: 
       break;
   }
   return updatedPiece;
 }
 
 int main(){
+  signal(SIGINT, SIG_IGN); // ignore ctrl-c
   srand(time(NULL)); // set rand seed to unix time
-  initDisplay(); // hide cursor and stuff
- 
-  // Configure for async input using curses
-  WINDOW* w = initscr();
-  noecho(); 
-  nodelay(w, 1);
-
   debug(stdout, info, "Starting game...");
+  
+  initDisplay(); // hide cursor and stuff
   initGame(&game);
   getNextPiece(&game);
   spawnPiece(&game);
-  
-  // make debbugging faster
+ 
+  // will implement levels soon
   game.level = 16;
   while(1){
     // Get input
     if(parseInput(&game)) drawBoard(&game);
 
     if(update(&game)) drawBoard(&game);
-    usleep(1000); 
   }
   exitDisplay();
   return 0;
