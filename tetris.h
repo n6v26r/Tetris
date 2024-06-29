@@ -9,7 +9,7 @@
 #define SIZEY 25
 #define TETRIMINOS 7
 
-#define SPWNY 24
+#define SPWNY 25
 #define SPWNX 5
 
 enum Tetriminos{
@@ -89,6 +89,7 @@ typedef struct _GameManager{
   double time;
   double lastDescend;
   unsigned int score;
+  unsigned int linesCleared;
   unsigned int sizeX; //
   unsigned int sizeY; // dimensions
   unsigned int level;
@@ -97,6 +98,7 @@ typedef struct _GameManager{
   enum Tetriminos curr; // current piece
   int currPieceState[4][4];
   pos currPos;
+  pos projectionPos;
   enum Tetriminos* next; // pointer to the piece bag
   // This implementation uses the original random bag extract method as the original tetris game.
   enum Tetriminos pieceBag[TETRIMINOS];
@@ -105,6 +107,9 @@ typedef struct _GameManager{
 } gameManager;
 
 const double pieceFallDelay[MAX_LVLS] = {1, 0.95, 0.90, 0.85, 0.80, 0.75, 0.70, 0.65, 0.60, 0.55, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25, 0.20, 0.15, 0.10, 0.05}; // higher lvl => faster falling pieces
+
+// Using the original NES formula, score = multiplier[linesCleared]*(level+1)
+const int scoreMultiplier[] = {0, 40, 100, 300, 1200};
 
 const enum Tetriminos pieces[] = {_NULL, I, J, L, O, S, T, Z};
 
@@ -129,6 +134,8 @@ void clearLine(gameManager *game, int y);
 
 void freezePiece(gameManager *game);
 
+void calculateProj(gameManager *game);
+
 bool inBounds(int x, int y){
   return x>=0 && y>=0 && x<SIZEX && y<SIZEY;
 }
@@ -140,7 +147,7 @@ void initGame(gameManager* game){
   game->level = 0;
   game->score = 0;
   game->hold = _NULL;
-  game->currPos = (pos){0,  0};
+  game->currPos = game->projectionPos = (pos){0,  0};
   game->bagSize = 0;
   game->pieceHeld = false;
   refreshBag(game);
@@ -210,8 +217,8 @@ void rotatePiece(gameManager *game){
   int buffer[4][4];
 
   for(int i = 0; i < n; i++){
-		for(int j = 0, k = n-1; j<n; j++, k--)
-			buffer[i][j] = game->currPieceState[k][i];
+    for(int j = 0, k = n-1; j<n; j++, k--)
+      buffer[i][j] = game->currPieceState[k][i];
   }
   removePiece(game);
   
@@ -319,28 +326,36 @@ void cancelCurrPiece(gameManager* game){
 }
 
 bool update(gameManager* game){
-  if(getTime()-game->lastDescend<=pieceFallDelay[game->level]) return false;
-  game->lastDescend = getTime();
+  bool rtrn = false;
   removePiece(game);
-  game->currPos.y--;
+  if(getTime()-game->lastDescend>pieceFallDelay[game->level]){
+    game->lastDescend = getTime();
+    game->currPos.y--;
 
-  int coll = collision(game);
-  if(coll==-3 || coll>0){ // reached bottom
-    game->currPos.y++;
-    freezePiece(game);
+    int coll = collision(game);
+    if(coll==-3 || coll>0){ // reached bottom
+      game->currPos.y++;
+      freezePiece(game);
+    }
+    rtrn = true;
   }
-
+  calculateProj(game);
   drawPiece(game);
-  return true;
+  return rtrn;
 }
 
 void freezePiece(gameManager *game){
   drawPiece(game);
   // clear all possible lines
+  int lines = 0;
   for(int y = 0; y<size(game->curr); y++){
-    if(checkLine(game, game->currPos.y-y))
+    if(checkLine(game, game->currPos.y-y)){
       clearLine(game, game->currPos.y-y);
+      lines++;
+    }
   }
+  game->linesCleared+=lines;
+  game->score+=scoreMultiplier[lines]*(game->level+1);
 
   getNextPiece(game);
   spawnPiece(game);
@@ -391,4 +406,16 @@ int collision(gameManager *game){
         if(inBounds(x+cx, cy-y) && game->board[cy-y][cx+x]) return game->board[cy-y][cx+x];
     }
   return 0;
+}
+
+void calculateProj(gameManager *game){
+  pos savePos = game->currPos;
+  int coll;
+  do{
+    game->currPos.y--;
+    coll = collision(game);
+  }while(!coll);
+  game->currPos.y++;
+  game->projectionPos = game->currPos;
+  game->currPos = savePos;
 }

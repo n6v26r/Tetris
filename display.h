@@ -33,9 +33,18 @@ void drawBoard(gameManager* game){
   clearScreen();
   for(int i=game->sizeY-1; i>=0; i--){
     for(int j=0; j<game->sizeX; j++){
-      if(game->board[i][j]>0) printf("[]");
-      else if(game->board[i][j]==0)printf("  ");
-      else printf("##");
+      // in projection box bounds
+      if(game->projectionPos.y-i<size(game->curr) && game->projectionPos.y-i>=0 && j-game->projectionPos.x<size(game->curr) && j-game->projectionPos.x>=0){
+        if(game->currPieceState[game->projectionPos.y-i][j-game->projectionPos.x] && !game->board[i][j]) printf("..");
+	else if(game->board[i][j]>0) printf("[]");
+        else if(game->board[i][j]==0)printf("  ");
+        else printf("##");
+      }
+      else{
+        if(game->board[i][j]>0) printf("[]");
+        else if(game->board[i][j]==0)printf("  ");
+        else printf("##");
+      }
     }
     printf("%s", ENDL);
   }

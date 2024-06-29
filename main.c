@@ -72,12 +72,17 @@ int main(){
   spawnPiece(&game);
  
   // will implement levels soon
-  game.level = 16;
   while(1){
+    bool redraw = false;
     // Get input
-    if(parseInput(&game)) drawBoard(&game);
+    if(parseInput(&game)) redraw = true;
 
-    if(update(&game)) drawBoard(&game);
+    if(update(&game)) redraw = true;
+    
+    if(redraw) drawBoard(&game), 
+	    debug(stdout, info, "Score: %d", game.score);
+	    //debug(stdout, info, "Proj: %d %d", game.projectionPos.x, game.projectionPos.y);
+  
   }
   exitDisplay();
   return 0;
