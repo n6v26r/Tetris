@@ -80,9 +80,10 @@ int main(){
     if(update(&game)) redraw = true;
     
     if(redraw) drawBoard(&game), 
-	    debug(stdout, info, "Score: %d", game.score);
-	    //debug(stdout, info, "Proj: %d %d", game.projectionPos.x, game.projectionPos.y);
-  
+        debug(stdout, info, "Next: %c | Hold: %c", pieceShape[*(game.next)], pieceShape[game.hold]),
+	    debug(stdout, info, "Level: %d", game.level),
+	    debug(stdout, info, "Score: %d", game.score),
+	    debug(stdout, info, "Lines cleared: %d", game.linesCleared);
   }
   exitDisplay();
   return 0;

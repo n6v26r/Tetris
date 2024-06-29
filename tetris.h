@@ -12,6 +12,9 @@
 #define SPWNY 25
 #define SPWNX 5
 
+#define LVL_PROGRESSION 1
+#define SHADOW 1
+
 enum Tetriminos{
   _NULL = 0,
   I = 1,
@@ -112,6 +115,7 @@ const double pieceFallDelay[MAX_LVLS] = {1, 0.95, 0.90, 0.85, 0.80, 0.75, 0.70, 
 const int scoreMultiplier[] = {0, 40, 100, 300, 1200};
 
 const enum Tetriminos pieces[] = {_NULL, I, J, L, O, S, T, Z};
+const char pieceShape[] = {' ', 'I', 'J', 'L', 'O', 'S', 'T', 'Z'};
 
 void refreshBag(gameManager* game); 
 
@@ -135,6 +139,7 @@ void clearLine(gameManager *game, int y);
 void freezePiece(gameManager *game);
 
 void calculateProj(gameManager *game);
+bool isPieceOnTop(gameManager *game);
 
 bool inBounds(int x, int y){
   return x>=0 && y>=0 && x<SIZEX && y<SIZEY;
@@ -239,8 +244,10 @@ void rotatePiece(gameManager *game){
     if(coll==left) game->currPos.x++;
     if(coll==right) game->currPos.x--;
     if(coll==bottom) game->currPos.y++;
+    // special case
+    if(coll>0 && isPieceOnTop(game)) game->currPos.y++;
   }while(coll<0);
-  
+
   if(coll) {
     game->currPos = savePos;
     for(int y=0; y<n; y++)
@@ -307,7 +314,7 @@ void spawnPiece(gameManager* game){
   for(int y=0; y<size(game->curr); y++)
     for(int x=0; x<size(game->curr); x++){
       game->currPieceState[y][x] = piece[game->curr][y][x];
-      assert(game->board[game->currPos.y-y][game->currPos.x+x]==0, err, "{GAME OVER} SPWN obstructed"); 
+      assert(game->currPieceState[y][x]==0 || game->board[game->currPos.y-y][game->currPos.x+x]==0, err, "{GAME OVER} SPWN obstructed"); 
     }
   drawPiece(game);
 }
@@ -356,7 +363,7 @@ void freezePiece(gameManager *game){
   }
   game->linesCleared+=lines;
   game->score+=scoreMultiplier[lines]*(game->level+1);
-
+  if(LVL_PROGRESSION) game->level = game->linesCleared/10;
   getNextPiece(game);
   spawnPiece(game);
 }
@@ -409,6 +416,7 @@ int collision(gameManager *game){
 }
 
 void calculateProj(gameManager *game){
+  if(!SHADOW) return;
   pos savePos = game->currPos;
   int coll;
   do{
@@ -418,4 +426,19 @@ void calculateProj(gameManager *game){
   game->currPos.y++;
   game->projectionPos = game->currPos;
   game->currPos = savePos;
+}
+
+bool isPieceOnTop(gameManager *game){
+  for(int y=0; y<size(game->curr); y++){
+    for(int x=0; x<size(game->curr); x++){
+      if(game->currPieceState[y][x]){
+        int X = game->currPos.x+x;
+        for(int Y = game->currPos.y-y; Y<SIZEY; Y++){
+          if(!inBounds(X, Y)) continue;
+          if(game->board[Y][X]) return false;
+        }
+      }
+    }
+  }
+  return true;
 }
